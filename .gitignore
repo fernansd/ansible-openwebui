@@ -1,0 +1,12 @@
+# Posibles variables sensibles Terraform
+*.tfvars
+plan.tfplan
+*.tfstate
+*.tfstate.backup
+# Claves SSH
+*.key
+*.pub
+# Configuración local Ansible
+hosts.ini
+# Ignorar carpetas operativas
+.terraform/

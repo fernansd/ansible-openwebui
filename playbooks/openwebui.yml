@@ -1,0 +1,85 @@
+---
+- name: Setup Docker and Create Docker Compose Service
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg2
+          - software-properties-common
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker's official GPG key
+      apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: latest
+      when: ansible_os_family == "Debian"
+
+    - name: Create Docker Compose project directory
+      file:
+        path: /opt/open-webui
+        state: directory
+
+    - name: Create docker-compose.yml file
+      copy:
+        dest: /opt/open-webui/docker-compose.yml
+        content: |
+          services:
+            open-webui:
+              image: ghcr.io/open-webui/open-webui:main
+              ports:
+                - "3000:8080"
+              extra_hosts:
+                - "host.docker.internal:host-gateway"
+              volumes:
+                - open-webui:/app/backend/data
+              restart: always
+          volumes:
+            open-webui:
+
+    - name: Create systemd service for Docker Compose
+      copy:
+        dest: /etc/systemd/system/open-webui.service
+        content: |
+          [Unit]
+          Description=Docker Compose Open Web UI
+          Requires=docker.service
+          After=docker.service
+          AssertPathExists=/opt/open-webui
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          TimeoutStartSec=0
+          WorkingDirectory=/opt/open-webui
+          ExecStart=/usr/local/bin/docker compose -f /opt/open-webui/docker-compose.yml up -d
+          ExecStop=/usr/local/bin/docker compose -f /opt/open-webui/docker-compose.yml down
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start the open-webui service
+      systemd:
+        name: open-webui.service
+        enabled: true
+        state: started
+
+
